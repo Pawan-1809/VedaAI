@@ -12,25 +12,35 @@ import {
   ArrowLeft,
   ArrowRight,
   Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   submitAssignment,
   setFormData,
   clearError,
+  resetForm,
 } from "@/store/assignmentSlice";
 import {
   assignmentFormSchema,
   QUESTION_TYPE_OPTIONS,
   type AssignmentFormData,
 } from "@/lib/validationSchema";
+import { useAssignmentSocket } from "@/hooks/useAssignmentSocket";
 import StepperInput from "./StepperInput";
 
 export default function AssignmentForm() {
   const dispatch = useAppDispatch();
-  const { isSubmitting, error, assignmentId } = useAppSelector(
-    (s) => s.assignment
-  );
+  const {
+    isSubmitting,
+    error,
+    assignmentId,
+    generationStatus,
+    generatedPaper,
+  } = useAppSelector((s) => s.assignment);
+
+  useAssignmentSocket(assignmentId);
 
   const {
     register,
@@ -77,17 +87,129 @@ export default function AssignmentForm() {
     dispatch(submitAssignment(data));
   };
 
-  if (assignmentId) {
+  if (assignmentId && generationStatus === "completed" && generatedPaper) {
+    const paper = generatedPaper as {
+      title?: string;
+      total_marks?: number;
+      sections?: Array<{
+        name: string;
+        type: string;
+        questions: Array<{
+          number: number;
+          text: string;
+          marks: number;
+          difficulty: string;
+        }>;
+      }>;
+    };
+
+    return (
+      <div className="flex flex-col gap-8">
+        <div className="flex items-center gap-4">
+          <CheckCircle2 size={32} className="text-[#4bc26d]" />
+          <div>
+            <h2 className="text-xl font-bold text-[#303030]">
+              {paper.title || "Assessment Paper"}
+            </h2>
+            <p className="text-sm text-[rgba(94,94,94,0.8)]">
+              Total Marks: {paper.total_marks} &bull; {paper.sections?.length || 0} Sections
+            </p>
+          </div>
+        </div>
+
+        {paper.sections?.map((section, si) => (
+          <div key={si} className="bg-white rounded-2xl p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#303030]">
+                {section.name}
+              </h3>
+              <span className="px-3 py-1 bg-[#f6f6f6] rounded-full text-xs font-medium text-[rgba(94,94,94,0.8)]">
+                {section.type}
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">
+              {section.questions.map((q, qi) => (
+                <div
+                  key={qi}
+                  className="flex items-start gap-3 p-4 bg-[#f9f9f9] rounded-xl"
+                >
+                  <span className="w-7 h-7 rounded-full bg-[#303030] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    {q.number}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-[#303030] leading-relaxed">
+                      {q.text}
+                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-xs font-medium text-[rgba(94,94,94,0.8)]">
+                        {q.marks} marks
+                      </span>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          q.difficulty === "Easy"
+                            ? "bg-green-100 text-green-700"
+                            : q.difficulty === "Hard"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {q.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => dispatch(resetForm())}
+          className="self-start flex items-center gap-1 px-6 py-3 bg-[#181818] rounded-full text-base font-medium text-white hover:bg-[#303030] transition-colors"
+        >
+          <Plus size={20} />
+          Create Another
+        </button>
+      </div>
+    );
+  }
+
+  if (assignmentId && generationStatus === "failed") {
     return (
       <div className="flex flex-col items-center justify-center gap-6 py-20">
-        <div className="w-16 h-16 rounded-full bg-[#4bc26d]/20 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4bc26d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
+        <XCircle size={48} className="text-red-500" />
+        <h2 className="text-xl font-bold text-[#303030]">Generation Failed</h2>
+        <p className="text-sm text-[rgba(94,94,94,0.8)] text-center max-w-md">
+          {error || "Something went wrong while generating the paper."}
+        </p>
+        <button
+          type="button"
+          onClick={() => dispatch(resetForm())}
+          className="flex items-center gap-1 px-6 py-3 bg-[#181818] rounded-full text-base font-medium text-white hover:bg-[#303030] transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (assignmentId && generationStatus === "processing") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 py-20">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full border-4 border-[#dadada] border-t-[#303030] animate-spin" />
         </div>
-        <h2 className="text-2xl font-bold text-[#303030]">Assignment Created!</h2>
-        <p className="text-sm text-[rgba(94,94,94,0.8)]">
-          ID: <code className="bg-[#f6f6f6] px-2 py-1 rounded text-xs font-mono">{assignmentId}</code>
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-[#303030]">
+            Generating Your Paper...
+          </h2>
+          <p className="text-sm text-[rgba(94,94,94,0.8)] mt-1">
+            AI is crafting your assessment. This usually takes 10-30 seconds.
+          </p>
+        </div>
+        <p className="text-xs text-[rgba(94,94,94,0.55)]">
+          Assignment ID: {assignmentId}
         </p>
       </div>
     );

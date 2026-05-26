@@ -22,7 +22,7 @@ export const assignmentFormSchema = z.object({
   question_types: z
     .array(questionTypeItemSchema)
     .min(1, "Add at least one question type"),
-  additional_instructions: z.string().optional().default(""),
+  additional_instructions: z.string(),
 });
 
 export type AssignmentFormData = z.infer<typeof assignmentFormSchema>;

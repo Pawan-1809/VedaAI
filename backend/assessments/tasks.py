@@ -1,7 +1,9 @@
 import json
 import logging
 
+from asgiref.sync import async_to_sync
 from celery import shared_task
+from channels.layers import get_channel_layer
 from django.conf import settings
 from google import genai
 
@@ -70,6 +72,12 @@ OUTPUT FORMAT (strict JSON):
 Generate the paper now. Output ONLY the JSON."""
 
 
+def notify_client(assignment_id, event_type, payload):
+    channel_layer = get_channel_layer()
+    group_name = f"assignment_{assignment_id}"
+    async_to_sync(channel_layer.group_send)(group_name, payload)
+
+
 @shared_task(bind=True, max_retries=MAX_RETRIES)
 def generate_assessment_task(self, assignment_id):
     assignment = Assignment.objects.get(id=assignment_id)
@@ -99,6 +107,12 @@ def generate_assessment_task(self, assignment_id):
         assignment.save()
         logger.info("Assignment %s completed successfully.", assignment_id)
 
+        notify_client(assignment_id, "generation_complete", {
+            "type": "generation_complete",
+            "status": "completed",
+            "paper": paper_json,
+        })
+
     except ValueError as exc:
         logger.error("JSON parse failed for %s: %s", assignment_id, exc)
         if self.request.retries < MAX_RETRIES:
@@ -107,8 +121,18 @@ def generate_assessment_task(self, assignment_id):
             assignment.status = Assignment.Status.FAILED
             assignment.save()
             logger.error("Assignment %s failed after %d retries.", assignment_id, MAX_RETRIES)
+            notify_client(assignment_id, "generation_failed", {
+                "type": "generation_failed",
+                "status": "failed",
+                "error": "Failed to parse AI response after multiple retries.",
+            })
 
     except Exception as exc:
         logger.error("Unexpected error for %s: %s", assignment_id, exc)
         assignment.status = Assignment.Status.FAILED
         assignment.save()
+        notify_client(assignment_id, "generation_failed", {
+            "type": "generation_failed",
+            "status": "failed",
+            "error": str(exc),
+        })

@@ -6,6 +6,8 @@ interface AssignmentState {
   isSubmitting: boolean;
   error: string | null;
   assignmentId: string | null;
+  generationStatus: "idle" | "processing" | "completed" | "failed";
+  generatedPaper: Record<string, unknown> | null;
 }
 
 const initialState: AssignmentState = {
@@ -20,6 +22,8 @@ const initialState: AssignmentState = {
   isSubmitting: false,
   error: null,
   assignmentId: null,
+  generationStatus: "idle",
+  generatedPaper: null,
 };
 
 export const submitAssignment = createAsyncThunk(
@@ -80,6 +84,20 @@ const assignmentSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    setGenerationStatus(state, action: PayloadAction<string>) {
+      state.generationStatus = action.payload as AssignmentState["generationStatus"];
+    },
+    setGenerationResult(
+      state,
+      action: PayloadAction<{ status: string; paper: Record<string, unknown> }>
+    ) {
+      state.generationStatus = "completed";
+      state.generatedPaper = action.payload.paper;
+    },
+    setGenerationFailed(state, action: PayloadAction<string>) {
+      state.generationStatus = "failed";
+      state.error = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -90,6 +108,7 @@ const assignmentSlice = createSlice({
       .addCase(submitAssignment.fulfilled, (state, action) => {
         state.isSubmitting = false;
         state.assignmentId = action.payload.id;
+        state.generationStatus = "processing";
       })
       .addCase(submitAssignment.rejected, (state, action) => {
         state.isSubmitting = false;
@@ -110,6 +129,9 @@ export const {
   setFormData,
   resetForm,
   clearError,
+  setGenerationStatus,
+  setGenerationResult,
+  setGenerationFailed,
 } = assignmentSlice.actions;
 
 export default assignmentSlice.reducer;
