@@ -38,3 +38,23 @@ body {
 * {
   letter-spacing: -0.04em;
 }
+
+@media print {
+  body {
+    background: white !important;
+  }
+
+  aside {
+    display: none !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}
+

@@ -12,7 +12,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Loader2,
-  CheckCircle2,
   XCircle,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -29,6 +28,7 @@ import {
 } from "@/lib/validationSchema";
 import { useAssignmentSocket } from "@/hooks/useAssignmentSocket";
 import StepperInput from "./StepperInput";
+import ExamPaper from "./ExamPaper";
 
 export default function AssignmentForm() {
   const dispatch = useAppDispatch();
@@ -88,90 +88,11 @@ export default function AssignmentForm() {
   };
 
   if (assignmentId && generationStatus === "completed" && generatedPaper) {
-    const paper = generatedPaper as {
-      title?: string;
-      total_marks?: number;
-      sections?: Array<{
-        name: string;
-        type: string;
-        questions: Array<{
-          number: number;
-          text: string;
-          marks: number;
-          difficulty: string;
-        }>;
-      }>;
-    };
-
     return (
-      <div className="flex flex-col gap-8">
-        <div className="flex items-center gap-4">
-          <CheckCircle2 size={32} className="text-[#4bc26d]" />
-          <div>
-            <h2 className="text-xl font-bold text-[#303030]">
-              {paper.title || "Assessment Paper"}
-            </h2>
-            <p className="text-sm text-[rgba(94,94,94,0.8)]">
-              Total Marks: {paper.total_marks} &bull; {paper.sections?.length || 0} Sections
-            </p>
-          </div>
-        </div>
-
-        {paper.sections?.map((section, si) => (
-          <div key={si} className="bg-white rounded-2xl p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#303030]">
-                {section.name}
-              </h3>
-              <span className="px-3 py-1 bg-[#f6f6f6] rounded-full text-xs font-medium text-[rgba(94,94,94,0.8)]">
-                {section.type}
-              </span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {section.questions.map((q, qi) => (
-                <div
-                  key={qi}
-                  className="flex items-start gap-3 p-4 bg-[#f9f9f9] rounded-xl"
-                >
-                  <span className="w-7 h-7 rounded-full bg-[#303030] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {q.number}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-[#303030] leading-relaxed">
-                      {q.text}
-                    </p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-xs font-medium text-[rgba(94,94,94,0.8)]">
-                        {q.marks} marks
-                      </span>
-                      <span
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          q.difficulty === "Easy"
-                            ? "bg-green-100 text-green-700"
-                            : q.difficulty === "Hard"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {q.difficulty}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        <button
-          type="button"
-          onClick={() => dispatch(resetForm())}
-          className="self-start flex items-center gap-1 px-6 py-3 bg-[#181818] rounded-full text-base font-medium text-white hover:bg-[#303030] transition-colors"
-        >
-          <Plus size={20} />
-          Create Another
-        </button>
-      </div>
+      <ExamPaper
+        paper={generatedPaper as Record<string, unknown>}
+        onBack={() => dispatch(resetForm())}
+      />
     );
   }
 
