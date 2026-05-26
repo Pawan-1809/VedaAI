@@ -49,6 +49,30 @@ export const submitAssignment = createAsyncThunk(
   }
 );
 
+export const regenerateAssignment = createAsyncThunk(
+  "assignment/regenerate",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = (getState() as { assignment: AssignmentState }).assignment;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const res = await fetch(`${apiUrl}/assignments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state.formData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        return rejectWithValue(err);
+      }
+
+      return (await res.json()) as { id: string };
+    } catch {
+      return rejectWithValue({ detail: "Network error. Please try again." });
+    }
+  }
+);
+
 const assignmentSlice = createSlice({
   name: "assignment",
   initialState,
@@ -116,6 +140,22 @@ const assignmentSlice = createSlice({
           typeof action.payload === "object" && action.payload !== null
             ? JSON.stringify(action.payload)
             : "Something went wrong";
+      })
+      .addCase(regenerateAssignment.pending, (state) => {
+        state.generationStatus = "processing";
+        state.generatedPaper = null;
+        state.error = null;
+      })
+      .addCase(regenerateAssignment.fulfilled, (state, action) => {
+        state.assignmentId = action.payload.id;
+        state.generationStatus = "processing";
+      })
+      .addCase(regenerateAssignment.rejected, (state, action) => {
+        state.generationStatus = "failed";
+        state.error =
+          typeof action.payload === "object" && action.payload !== null
+            ? JSON.stringify(action.payload)
+            : "Regeneration failed";
       });
   },
 });

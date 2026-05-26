@@ -17,6 +17,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   submitAssignment,
+  regenerateAssignment,
   setFormData,
   clearError,
   resetForm,
@@ -92,6 +93,8 @@ export default function AssignmentForm() {
       <ExamPaper
         paper={generatedPaper as Record<string, unknown>}
         onBack={() => dispatch(resetForm())}
+        onRegenerate={() => dispatch(regenerateAssignment())}
+        isRegenerating={false}
       />
     );
   }

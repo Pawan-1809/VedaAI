@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useState } from "react";
+
 interface Question {
   number: number;
   text: string;
@@ -23,6 +25,8 @@ interface PaperData {
 interface ExamPaperProps {
   paper: PaperData;
   onBack?: () => void;
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
 }
 
 const DIFFICULTY_STYLES: Record<string, string> = {
@@ -35,35 +39,120 @@ function getSectionMarks(section: Section): number {
   return section.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
 }
 
-export default function ExamPaper({ paper, onBack }: ExamPaperProps) {
+export default function ExamPaper({
+  paper,
+  onBack,
+  onRegenerate,
+  isRegenerating,
+}: ExamPaperProps) {
+  const paperRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const sections = paper.sections || [];
-  const totalMarks = paper.total_marks || sections.reduce((s, sec) => s + getSectionMarks(sec), 0);
-  const totalQuestions = sections.reduce((s, sec) => s + sec.questions.length, 0);
+  const totalMarks =
+    paper.total_marks ||
+    sections.reduce((s, sec) => s + getSectionMarks(sec), 0);
+  const totalQuestions = sections.reduce(
+    (s, sec) => s + sec.questions.length,
+    0
+  );
+
+  const handleDownloadPdf = async () => {
+    if (!paperRef.current) return;
+    setIsExporting(true);
+
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      const paperTitle = paper.title || "Assessment_Paper";
+      const filename = paperTitle.replace(/\s+/g, "_") + ".pdf";
+
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            letterRendering: true,
+          },
+          jsPDF: {
+            unit: "mm",
+            format: "a4",
+            orientation: "portrait",
+          },
+          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        })
+        .from(paperRef.current)
+        .save();
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
       {/* Action bar — hidden on print */}
-      <div className="flex items-center justify-between print:hidden">
-        {onBack && (
+      <div className="flex items-center justify-between flex-wrap gap-3 print:hidden">
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white rounded-full text-sm font-medium text-[#303030] hover:bg-[#f6f6f6] transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              New Assignment
+            </button>
+          )}
+          {onRegenerate && (
+            <button
+              onClick={onRegenerate}
+              disabled={isRegenerating}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#dadada] rounded-full text-sm font-medium text-[#303030] hover:bg-[#f6f6f6] disabled:opacity-50 transition-colors"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={isRegenerating ? "animate-spin" : ""}
+              >
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              {isRegenerating ? "Regenerating..." : "Regenerate"}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white rounded-full text-sm font-medium text-[#303030] hover:bg-[#f6f6f6] transition-colors"
+            onClick={handleDownloadPdf}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#181818] rounded-full text-sm font-medium text-white hover:bg-[#303030] disabled:opacity-50 transition-colors"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            Back
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            {isExporting ? "Exporting..." : "Download PDF"}
           </button>
-        )}
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#181818] rounded-full text-sm font-medium text-white hover:bg-[#303030] transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
-          Print Paper
-        </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#dadada] rounded-full text-sm font-medium text-[#303030] hover:bg-[#f6f6f6] transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+            Print
+          </button>
+        </div>
       </div>
 
-      {/* Paper */}
-      <div className="bg-white rounded-2xl print:rounded-none shadow-[0_2px_24px_rgba(0,0,0,0.06)] print:shadow-none overflow-hidden">
+      {/* Paper — this ref is what gets exported to PDF */}
+      <div
+        ref={paperRef}
+        className="bg-white rounded-2xl print:rounded-none shadow-[0_2px_24px_rgba(0,0,0,0.06)] print:shadow-none overflow-hidden"
+      >
         {/* Header band */}
         <div className="bg-[#1a1a1a] px-6 py-1.5 flex items-center justify-between print:bg-black">
           <span className="text-[10px] font-medium text-white/50 tracking-widest uppercase">
@@ -81,11 +170,20 @@ export default function ExamPaper({ paper, onBack }: ExamPaperProps) {
               {paper.title || "Assessment Paper"}
             </h1>
             <div className="flex items-center gap-4 text-sm text-[#5e5e5e]">
-              <span>Total Marks: <strong className="text-[#1a1a1a]">{totalMarks}</strong></span>
+              <span>
+                Total Marks:{" "}
+                <strong className="text-[#1a1a1a]">{totalMarks}</strong>
+              </span>
               <span className="w-1 h-1 rounded-full bg-[#dadada]" />
-              <span>Questions: <strong className="text-[#1a1a1a]">{totalQuestions}</strong></span>
+              <span>
+                Questions:{" "}
+                <strong className="text-[#1a1a1a]">{totalQuestions}</strong>
+              </span>
               <span className="w-1 h-1 rounded-full bg-[#dadada]" />
-              <span>Sections: <strong className="text-[#1a1a1a]">{sections.length}</strong></span>
+              <span>
+                Sections:{" "}
+                <strong className="text-[#1a1a1a]">{sections.length}</strong>
+              </span>
             </div>
           </div>
 
@@ -153,7 +251,8 @@ export default function ExamPaper({ paper, onBack }: ExamPaperProps) {
                 <ol className="flex flex-col gap-3">
                   {section.questions.map((q, qi) => {
                     const diffStyle =
-                      DIFFICULTY_STYLES[q.difficulty] || DIFFICULTY_STYLES.Moderate;
+                      DIFFICULTY_STYLES[q.difficulty] ||
+                      DIFFICULTY_STYLES.Moderate;
 
                     return (
                       <li
