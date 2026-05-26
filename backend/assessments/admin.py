@@ -11,10 +11,10 @@ class GeneratedPaperInline(admin.StackedInline):
 
 @admin.register(Assignment)
 class AssignmentAdmin(admin.ModelAdmin):
-    list_display = ("title", "subject", "grade_level", "status", "due_date", "created_at")
-    list_filter = ("status", "subject", "grade_level")
+    list_display = ("title", "subject", "status", "number_of_questions", "total_marks", "due_date", "created_at")
+    list_filter = ("status",)
     search_fields = ("title", "subject")
-    readonly_fields = ("id", "created_at", "updated_at")
+    readonly_fields = ("id", "number_of_questions", "total_marks", "created_at", "updated_at")
     inlines = [GeneratedPaperInline]
 
 

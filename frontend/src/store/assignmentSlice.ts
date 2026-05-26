@@ -1,0 +1,115 @@
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import type { AssignmentFormData, QuestionTypeItem } from "@/lib/validationSchema";
+
+interface AssignmentState {
+  formData: AssignmentFormData;
+  isSubmitting: boolean;
+  error: string | null;
+  assignmentId: string | null;
+}
+
+const initialState: AssignmentState = {
+  formData: {
+    due_date: "",
+    question_types: [
+      { type: "Multiple Choice Questions", count: 4, marks_per_question: 1 },
+      { type: "Short Questions", count: 3, marks_per_question: 2 },
+    ],
+    additional_instructions: "",
+  },
+  isSubmitting: false,
+  error: null,
+  assignmentId: null,
+};
+
+export const submitAssignment = createAsyncThunk(
+  "assignment/submit",
+  async (data: AssignmentFormData, { rejectWithValue }) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const res = await fetch(`${apiUrl}/assignments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        return rejectWithValue(err);
+      }
+
+      return (await res.json()) as { id: string };
+    } catch {
+      return rejectWithValue({ detail: "Network error. Please try again." });
+    }
+  }
+);
+
+const assignmentSlice = createSlice({
+  name: "assignment",
+  initialState,
+  reducers: {
+    setDueDate(state, action: PayloadAction<string>) {
+      state.formData.due_date = action.payload;
+    },
+    setAdditionalInstructions(state, action: PayloadAction<string>) {
+      state.formData.additional_instructions = action.payload;
+    },
+    addQuestionType(state, action: PayloadAction<QuestionTypeItem>) {
+      state.formData.question_types.push(action.payload);
+    },
+    removeQuestionType(state, action: PayloadAction<number>) {
+      state.formData.question_types.splice(action.payload, 1);
+    },
+    updateQuestionType(
+      state,
+      action: PayloadAction<{ index: number; field: keyof QuestionTypeItem; value: string | number }>
+    ) {
+      const { index, field, value } = action.payload;
+      const qt = state.formData.question_types[index];
+      if (qt) {
+        (qt as Record<string, string | number>)[field] = value;
+      }
+    },
+    setFormData(state, action: PayloadAction<AssignmentFormData>) {
+      state.formData = action.payload;
+    },
+    resetForm(state) {
+      Object.assign(state, initialState);
+    },
+    clearError(state) {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(submitAssignment.pending, (state) => {
+        state.isSubmitting = true;
+        state.error = null;
+      })
+      .addCase(submitAssignment.fulfilled, (state, action) => {
+        state.isSubmitting = false;
+        state.assignmentId = action.payload.id;
+      })
+      .addCase(submitAssignment.rejected, (state, action) => {
+        state.isSubmitting = false;
+        state.error =
+          typeof action.payload === "object" && action.payload !== null
+            ? JSON.stringify(action.payload)
+            : "Something went wrong";
+      });
+  },
+});
+
+export const {
+  setDueDate,
+  setAdditionalInstructions,
+  addQuestionType,
+  removeQuestionType,
+  updateQuestionType,
+  setFormData,
+  resetForm,
+  clearError,
+} = assignmentSlice.actions;
+
+export default assignmentSlice.reducer;

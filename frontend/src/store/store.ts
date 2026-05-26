@@ -1,7 +1,10 @@
 import { configureStore } from "@reduxjs/toolkit";
+import assignmentReducer from "./assignmentSlice";
 
 export const store = configureStore({
-  reducer: {},
+  reducer: {
+    assignment: assignmentReducer,
+  },
 });
 
 export type RootState = ReturnType<typeof store.getState>;
