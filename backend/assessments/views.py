@@ -25,7 +25,16 @@ class AssignmentCreateView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         assignment = serializer.save()
-        generate_assessment_task.delay(str(assignment.id))
+        
+        try:
+            generate_assessment_task.delay(str(assignment.id))
+        except Exception as e:
+            assignment.delete() # Rollback
+            return Response(
+                {"detail": f"Failed to connect to Celery/Redis background worker: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+            
         return Response(
             {"id": str(assignment.id)},
             status=status.HTTP_202_ACCEPTED,
