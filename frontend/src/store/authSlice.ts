@@ -47,7 +47,11 @@ export const logout = createAsyncThunk("auth/logout", async () => {
 const authSlice = createSlice({
   name: "auth",
   initialState,
-  reducers: {},
+  reducers: {
+    hydrateAuth: (state) => {
+      state.token = getAuthToken();
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(login.pending, (state) => {
@@ -71,4 +75,5 @@ const authSlice = createSlice({
   },
 });
 
+export const { hydrateAuth } = authSlice.actions;
 export default authSlice.reducer;
