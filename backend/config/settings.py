@@ -159,6 +159,11 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = ("localhost" in REDIS_URL) or (REDIS_URL == "redis://localhost:6379/0")
 
+if REDIS_URL.startswith("rediss://"):
+    import ssl
+    CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+    CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+
 # Channels
 if "localhost" in REDIS_URL or not REDIS_URL:
     CHANNEL_LAYERS = {
