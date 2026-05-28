@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-import dj_database_url
-
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -76,11 +74,17 @@ ASGI_APPLICATION = "config.asgi.application"
 
 
 # Database
+MONGODB_URI = os.getenv(
+    "MONGODB_URI",
+    "mongodb+srv://pawankr16123114_db_user:6ovMZ01lfFv7MSsS@cluster0.bwwuexb.mongodb.net/?appName=Cluster0"
+)
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL", "sqlite:///db.sqlite3"),
-        conn_max_age=600
-    )
+    "default": {
+        "ENGINE": "django_mongodb_backend",
+        "NAME": "vedaai",
+        "HOST": MONGODB_URI,
+    }
 }
 
 
@@ -116,7 +120,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = "django_mongodb_backend.fields.ObjectIdAutoField"
 
 
 # CORS
@@ -148,33 +152,12 @@ REST_FRAMEWORK = {
 }
 
 
-# Celery
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = TIME_ZONE
-
-
 # Channels
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {
-                "hosts": [REDIS_URL],
-            },
-        }
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
     }
-else:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer",
-        }
-    }
+}
 
 
 # Gemini
@@ -184,4 +167,14 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+MIGRATION_MODULES = {
+    'auth': 'config.mongo_migrations.auth',
+    'admin': 'config.mongo_migrations.admin',
+    'contenttypes': 'config.mongo_migrations.contenttypes',
+    'sessions': 'config.mongo_migrations.sessions',
+    'authtoken': 'config.mongo_migrations.authtoken',
+}
+
+SILENCED_SYSTEM_CHECKS = ['mongodb.fields.auto.E001']
 
