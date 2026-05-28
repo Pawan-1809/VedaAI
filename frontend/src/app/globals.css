@@ -39,12 +39,32 @@ body {
   letter-spacing: -0.04em;
 }
 
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove touch highlight on mobile */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
 @media print {
   body {
     background: white !important;
   }
 
   aside {
+    display: none !important;
+  }
+
+  header:first-of-type {
+    display: none !important;
+  }
+
+  nav:last-of-type {
     display: none !important;
   }
 
@@ -57,4 +77,3 @@ body {
     display: none !important;
   }
 }
-

@@ -13,13 +13,24 @@ interface Question {
 interface Section {
   name: string;
   type: string;
+  instruction?: string;
   questions: Question[];
+}
+
+interface AnswerKeyItem {
+  number: number;
+  answer: string;
 }
 
 interface PaperData {
   title?: string;
+  subject?: string;
+  grade_level?: string;
+  institution?: string;
+  duration?: string;
   total_marks?: number;
   sections?: Section[];
+  answer_key?: AnswerKeyItem[];
 }
 
 interface ExamPaperProps {
@@ -47,6 +58,7 @@ export default function ExamPaper({
 }: ExamPaperProps) {
   const paperRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showAnswerKey, setShowAnswerKey] = useState(false);
   const sections = paper.sections || [];
   const totalMarks =
     paper.total_marks ||
@@ -93,9 +105,9 @@ export default function ExamPaper({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Action bar — hidden on print */}
+      {/* Action bar */}
       <div className="flex items-center justify-between flex-wrap gap-3 print:hidden">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {onBack && (
             <button
               onClick={onBack}
@@ -136,55 +148,52 @@ export default function ExamPaper({
             className="flex items-center gap-2 px-5 py-2.5 bg-[#181818] rounded-full text-sm font-medium text-white hover:bg-[#303030] disabled:opacity-50 transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {isExporting ? "Exporting..." : "Download PDF"}
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#dadada] rounded-full text-sm font-medium text-[#303030] hover:bg-[#f6f6f6] transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
-            Print
+            {isExporting ? "Exporting..." : "Download as PDF"}
           </button>
         </div>
       </div>
 
-      {/* Paper — this ref is what gets exported to PDF */}
+      {/* Paper */}
       <div
         ref={paperRef}
         className="bg-white rounded-2xl print:rounded-none shadow-[0_2px_24px_rgba(0,0,0,0.06)] print:shadow-none overflow-hidden"
       >
         {/* Header band */}
         <div className="bg-[#1a1a1a] px-6 py-1.5 flex items-center justify-between print:bg-black">
-          <span className="text-[10px] font-medium text-white/50 tracking-widest uppercase">
+          <span className="text-[10px] font-medium text-[#ffffff80] tracking-widest uppercase">
             VedaAI Assessment
           </span>
-          <span className="text-[10px] font-medium text-white/50 tracking-widest uppercase">
+          <span className="text-[10px] font-medium text-[#ffffff80] tracking-widest uppercase">
             Confidential
           </span>
         </div>
 
-        <div className="px-8 sm:px-12 py-8 sm:py-10 flex flex-col gap-8">
-          {/* Title block */}
-          <div className="flex flex-col items-center gap-2 text-center border-b-2 border-[#1a1a1a] pb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">
-              {paper.title || "Assessment Paper"}
+        <div className="px-6 sm:px-12 py-8 sm:py-10 flex flex-col gap-8">
+          {/* Institution + Title block */}
+          <div className="flex flex-col items-center gap-1 text-center border-b-2 border-[#1a1a1a] pb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a1a] tracking-tight">
+              {paper.institution || "Delhi Public School, Sector-4, Bokaro"}
             </h1>
-            <div className="flex items-center gap-4 text-sm text-[#5e5e5e]">
-              <span>
-                Total Marks:{" "}
-                <strong className="text-[#1a1a1a]">{totalMarks}</strong>
-              </span>
-              <span className="w-1 h-1 rounded-full bg-[#dadada]" />
-              <span>
-                Questions:{" "}
-                <strong className="text-[#1a1a1a]">{totalQuestions}</strong>
-              </span>
-              <span className="w-1 h-1 rounded-full bg-[#dadada]" />
-              <span>
-                Sections:{" "}
-                <strong className="text-[#1a1a1a]">{sections.length}</strong>
-              </span>
-            </div>
+            {paper.subject && (
+              <p className="text-sm text-[#5e5e5e]">
+                Subject: {paper.subject}
+              </p>
+            )}
+            {paper.grade_level && (
+              <p className="text-sm text-[#5e5e5e]">
+                Class: {paper.grade_level}
+              </p>
+            )}
+          </div>
+
+          {/* Time & Marks row */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[#1a1a1a]">
+              Time Allowed: <strong>{paper.duration || "3 Hours"}</strong>
+            </span>
+            <span className="text-[#1a1a1a]">
+              Maximum Marks: <strong>{totalMarks}</strong>
+            </span>
           </div>
 
           {/* Student info */}
@@ -247,6 +256,13 @@ export default function ExamPaper({
                   </span>
                 </div>
 
+                {/* Section instruction */}
+                {section.instruction && (
+                  <p className="text-xs italic text-[#808080] -mt-2">
+                    {section.instruction}
+                  </p>
+                )}
+
                 {/* Questions */}
                 <ol className="flex flex-col gap-3">
                   {section.questions.map((q, qi) => {
@@ -259,12 +275,10 @@ export default function ExamPaper({
                         key={qi}
                         className="flex gap-3 sm:gap-4 py-3 px-3 sm:px-4 rounded-xl hover:bg-[#fafafa] transition-colors print:hover:bg-transparent print:py-2 print:px-0"
                       >
-                        {/* Question number */}
                         <span className="text-sm font-bold text-[#1a1a1a] mt-0.5 shrink-0 w-6 text-right">
                           {q.number}.
                         </span>
 
-                        {/* Question body */}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm sm:text-base text-[#2a2a2a] leading-relaxed font-medium">
                             {q.text}
@@ -279,7 +293,6 @@ export default function ExamPaper({
                           </div>
                         </div>
 
-                        {/* Marks */}
                         <span className="text-sm font-semibold text-[#5e5e5e] shrink-0 mt-0.5 tabular-nums">
                           [{q.marks}]
                         </span>
@@ -291,13 +304,73 @@ export default function ExamPaper({
             );
           })}
 
+          {/* Answer Key toggle */}
+          {paper.answer_key && paper.answer_key.length > 0 && (
+            <div className="border-t-2 border-[#e0e0e0] pt-4">
+              <button
+                onClick={() => setShowAnswerKey(!showAnswerKey)}
+                className="flex items-center gap-2 text-sm font-bold text-[#1a1a1a] hover:text-[#5e5e5e] transition-colors print:hidden"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform ${showAnswerKey ? "rotate-90" : ""}`}
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+                Answer Key
+              </button>
+
+              {showAnswerKey && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                  {paper.answer_key.map((item, i) => (
+                    <div
+                      key={i}
+                      className="flex gap-2 py-2 border-b border-dashed border-[#e8e8e8] last:border-0"
+                    >
+                      <span className="text-sm font-bold text-[#1a1a1a] shrink-0 w-8">
+                        Q{item.number}.
+                      </span>
+                      <span className="text-sm text-[#404040]">
+                        {item.answer}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Always visible in print */}
+              <div className="hidden print:block mt-4">
+                <h3 className="text-base font-bold text-[#1a1a1a] mb-3">Answer Key</h3>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                  {paper.answer_key.map((item, i) => (
+                    <div key={i} className="flex gap-2 py-1">
+                      <span className="text-sm font-bold text-[#1a1a1a] shrink-0 w-8">
+                        Q{item.number}.
+                      </span>
+                      <span className="text-sm text-[#404040]">
+                        {item.answer}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="border-t-2 border-[#e0e0e0] pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-[#a0a0a0] italic">
               End of Question Paper
             </p>
             <p className="text-xs text-[#a0a0a0]">
-              Generated by VedaAI &bull; Total Marks: {totalMarks}
+              Generated by VedaAI &bull; Total Marks: {totalMarks} &bull; {totalQuestions} Questions
             </p>
           </div>
         </div>

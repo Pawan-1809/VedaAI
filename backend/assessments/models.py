@@ -19,6 +19,9 @@ class Assignment(models.Model):
     number_of_questions = models.PositiveIntegerField(default=0)
     total_marks = models.PositiveIntegerField(default=0)
     additional_instructions = models.TextField(blank=True, default="")
+    uploaded_file = models.ImageField(
+        upload_to="uploads/assignments/", blank=True, null=True
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

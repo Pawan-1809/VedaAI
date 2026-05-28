@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import StoreProvider from "@/store/provider";
 
@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   title: "VedaAI — AI Assessment Creator",
   description:
     "Generate structured question papers with AI-powered assessment creation",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({

@@ -8,15 +8,17 @@ import {
   setGenerationStatus,
 } from "@/store/assignmentSlice";
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+const WS_BASE = (process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws").replace(/\/+$/, "");
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const POLL_INTERVAL = 3000;
+const MAX_POLL_FAILURES = 10;
 
 export function useAssignmentSocket(assignmentId: string | null) {
   const dispatch = useAppDispatch();
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const resolvedRef = useRef(false);
+  const pollFailureRef = useRef(0);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -28,14 +30,33 @@ export function useAssignmentSocket(assignmentId: string | null) {
   const startPolling = useCallback(() => {
     if (!assignmentId || pollRef.current) return;
 
+    const recordPollingFailure = () => {
+      pollFailureRef.current += 1;
+
+      if (pollFailureRef.current >= MAX_POLL_FAILURES) {
+        resolvedRef.current = true;
+        stopPolling();
+        dispatch(
+          setGenerationFailed(
+            "Unable to confirm generation status. Please check your connection and try again."
+          )
+        );
+      }
+    };
+
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(
           `${API_BASE}/assignments/${assignmentId}/status/`
         );
-        if (!res.ok) return;
+
+        if (!res.ok) {
+          recordPollingFailure();
+          return;
+        }
 
         const data = await res.json();
+        pollFailureRef.current = 0;
 
         if (data.status === "completed" && data.paper) {
           resolvedRef.current = true;
@@ -49,12 +70,16 @@ export function useAssignmentSocket(assignmentId: string | null) {
         } else if (data.status === "failed") {
           resolvedRef.current = true;
           stopPolling();
-          dispatch(setGenerationFailed("Generation failed. Please try again."));
+          dispatch(
+            setGenerationFailed(
+              data.error || "Generation failed. Please try again."
+            )
+          );
         } else {
           dispatch(setGenerationStatus(data.status));
         }
       } catch {
-        // Network error — keep polling
+        recordPollingFailure();
       }
     }, POLL_INTERVAL);
   }, [assignmentId, dispatch, stopPolling]);
@@ -63,10 +88,11 @@ export function useAssignmentSocket(assignmentId: string | null) {
     if (!assignmentId) return;
 
     resolvedRef.current = false;
+    pollFailureRef.current = 0;
 
-    const ws = new WebSocket(
-      `${WS_BASE}/ws/assignments/${assignmentId}/`
-    );
+    startPolling();
+
+    const ws = new WebSocket(`${WS_BASE}/assignments/${assignmentId}/`);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -74,15 +100,34 @@ export function useAssignmentSocket(assignmentId: string | null) {
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      let data: {
+        type?: string;
+        status?: string;
+        paper?: Record<string, unknown>;
+        error?: string;
+      };
+
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        resolvedRef.current = true;
+        stopPolling();
+        dispatch(
+          setGenerationFailed(
+            "Received an invalid generation update. Please try again."
+          )
+        );
+        ws.close();
+        return;
+      }
 
       if (data.type === "generation_complete") {
         resolvedRef.current = true;
         stopPolling();
         dispatch(
           setGenerationResult({
-            status: data.status,
-            paper: data.paper,
+            status: data.status || "completed",
+            paper: data.paper || {},
           })
         );
         ws.close();
@@ -94,21 +139,12 @@ export function useAssignmentSocket(assignmentId: string | null) {
       }
     };
 
-    ws.onerror = () => {
-      if (!resolvedRef.current) {
-        startPolling();
-      }
-    };
-
-    ws.onclose = () => {
-      if (!resolvedRef.current) {
-        startPolling();
-      }
-    };
-
     return () => {
       stopPolling();
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
         ws.close();
       }
     };

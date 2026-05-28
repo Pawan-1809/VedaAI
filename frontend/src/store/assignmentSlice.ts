@@ -8,6 +8,7 @@ interface AssignmentState {
   assignmentId: string | null;
   generationStatus: "idle" | "processing" | "completed" | "failed";
   generatedPaper: Record<string, unknown> | null;
+  uploadedFile: File | null;
 }
 
 const initialState: AssignmentState = {
@@ -24,17 +25,35 @@ const initialState: AssignmentState = {
   assignmentId: null,
   generationStatus: "idle",
   generatedPaper: null,
+  uploadedFile: null,
 };
 
 export const submitAssignment = createAsyncThunk(
   "assignment/submit",
-  async (data: AssignmentFormData, { rejectWithValue }) => {
+  async (
+    payload: { data: AssignmentFormData; file: File | null },
+    { rejectWithValue }
+  ) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const formData = new FormData();
+      formData.append("due_date", payload.data.due_date);
+      formData.append(
+        "question_types",
+        JSON.stringify(payload.data.question_types)
+      );
+      formData.append(
+        "additional_instructions",
+        payload.data.additional_instructions || ""
+      );
+
+      if (payload.file) {
+        formData.append("uploaded_file", payload.file);
+      }
+
       const res = await fetch(`${apiUrl}/assignments/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -55,10 +74,25 @@ export const regenerateAssignment = createAsyncThunk(
     try {
       const state = (getState() as { assignment: AssignmentState }).assignment;
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+      const formData = new FormData();
+      formData.append("due_date", state.formData.due_date);
+      formData.append(
+        "question_types",
+        JSON.stringify(state.formData.question_types)
+      );
+      formData.append(
+        "additional_instructions",
+        state.formData.additional_instructions || ""
+      );
+
+      if (state.uploadedFile) {
+        formData.append("uploaded_file", state.uploadedFile);
+      }
+
       const res = await fetch(`${apiUrl}/assignments/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state.formData),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -102,8 +136,13 @@ const assignmentSlice = createSlice({
     setFormData(state, action: PayloadAction<AssignmentFormData>) {
       state.formData = action.payload;
     },
+    setUploadedFile(state, action: PayloadAction<File | null>) {
+      // File objects can't be serialized by Redux but we store the reference
+      // for regenerate functionality. This is intentional.
+      state.uploadedFile = action.payload;
+    },
     resetForm(state) {
-      Object.assign(state, initialState);
+      Object.assign(state, { ...initialState, uploadedFile: null });
     },
     clearError(state) {
       state.error = null;
@@ -167,6 +206,7 @@ export const {
   removeQuestionType,
   updateQuestionType,
   setFormData,
+  setUploadedFile,
   resetForm,
   clearError,
   setGenerationStatus,

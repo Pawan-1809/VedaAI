@@ -6,8 +6,7 @@ export default function CreateAssignment() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      {/* Main content - offset for sidebar */}
-      <main className="ml-[304px] flex-1 flex justify-center py-[78px] px-8">
+      <main className="lg:ml-[304px] flex-1 flex justify-center pt-16 lg:pt-[78px] pb-20 lg:pb-8 px-4 lg:px-8">
         <div className="w-full max-w-[810px] flex flex-col gap-8">
           {/* Header */}
           <div className="flex items-center gap-4 px-2">
@@ -31,7 +30,7 @@ export default function CreateAssignment() {
           </div>
 
           {/* Form card */}
-          <div className="bg-[rgba(255,255,255,0.5)] rounded-[32px] p-8">
+          <div className="bg-[rgba(255,255,255,0.5)] rounded-[32px] p-5 sm:p-8">
             {/* Section title */}
             <div className="flex flex-col gap-[2px] mb-8">
               <h2 className="text-xl font-bold text-[#303030]">
