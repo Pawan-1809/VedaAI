@@ -25,8 +25,7 @@ class AssignmentCreateView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         assignment = serializer.save()
-        import threading
-        threading.Thread(target=generate_assessment_task, args=(str(assignment.id),)).start()
+        generate_assessment_task.delay(str(assignment.id))
         return Response(
             {"id": str(assignment.id)},
             status=status.HTTP_202_ACCEPTED,

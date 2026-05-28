@@ -72,19 +72,20 @@ SAMPLE_PAPER = {
 
 
 class AssignmentApiSmokeTests(TestCase):
-    def test_create_assignment_valid_payload_starts_thread(self):
-        with patch("assessments.views.threading.Thread") as mock_thread:
+    def test_create_assignment_valid_payload_queues_celery_task(self):
+        with patch("assessments.views.generate_assessment_task.delay") as delay:
             response = self.client.post(
                 "/api/assignments/",
                 data=SAMPLE_PAYLOAD,
                 content_type="application/json",
             )
-            self.assertEqual(response.status_code, 202)
-            mock_thread.assert_called_once()
+
+        self.assertEqual(response.status_code, 202)
         assignment = Assignment.objects.get(id=response.json()["id"])
         self.assertEqual(assignment.status, Assignment.Status.PENDING)
         self.assertEqual(assignment.number_of_questions, 3)
         self.assertEqual(assignment.total_marks, 7)
+        delay.assert_called_once_with(str(assignment.id))
 
     def test_create_assignment_rejects_invalid_marks_before_queueing(self):
         payload = {

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from pathlib import Path
 
 from asgiref.sync import async_to_sync
+from celery import shared_task
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.db import transaction
@@ -164,74 +165,71 @@ def fail_assignment(assignment, assignment_id, error_msg):
         )
 
 
-def generate_assessment_task(assignment_id):
+@shared_task(bind=True, max_retries=MAX_RETRIES, soft_time_limit=65, time_limit=75)
+def generate_assessment_task(self, assignment_id):
     assignment = Assignment.objects.get(id=assignment_id)
     assignment.status = Assignment.Status.PROCESSING
     assignment.save(update_fields=["status", "updated_at"])
 
-    for attempt in range(MAX_RETRIES + 1):
-        try:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
-            prompt = build_prompt(assignment)
+    try:
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        prompt = build_prompt(assignment)
 
-            image_path = None
-            if assignment.uploaded_file:
-                image_path = assignment.uploaded_file.path
+        image_path = None
+        if assignment.uploaded_file:
+            image_path = assignment.uploaded_file.path
 
-            response = generate_content_with_timeout(client, prompt, image_path)
+        response = generate_content_with_timeout(client, prompt, image_path)
 
-            raw_text = response.text
-            logger.info("LLM response length: %d chars", len(raw_text))
+        raw_text = response.text
+        logger.info("LLM response length: %d chars", len(raw_text))
 
-            paper_json = parse_llm_json(raw_text)
+        paper_json = parse_llm_json(raw_text)
 
-            with transaction.atomic():
-                GeneratedPaper.objects.update_or_create(
-                    assignment=assignment,
-                    defaults={"content": paper_json},
-                )
-
-                assignment.status = Assignment.Status.COMPLETED
-                assignment.save(update_fields=["status", "updated_at"])
-                logger.info("Assignment %s completed successfully.", assignment_id)
-
-                notify_client(
-                    assignment_id,
-                    "generation_complete",
-                    {
-                        "type": "generation_complete",
-                        "status": "completed",
-                        "paper": paper_json,
-                    },
-                )
-            return
-
-        except LLMTimeoutError as exc:
-            if attempt == MAX_RETRIES:
-                fail_assignment(
-                    assignment,
-                    assignment_id,
-                    "AI generation timed out. Please try again.",
-                )
-                return
-            logger.warning("Timeout for %s. Retrying...", assignment_id)
-
-        except (ValueError, APIError) as exc:
-            logger.error("API or parse error for %s: %s", assignment_id, exc)
-            if attempt == MAX_RETRIES:
-                error_msg = (
-                    "Gemini API is currently experiencing high demand. Please try again in a few moments."
-                    if isinstance(exc, APIError)
-                    else "Failed to parse AI response after multiple retries."
-                )
-                fail_assignment(assignment, assignment_id, error_msg)
-                return
-
-        except Exception as exc:
-            logger.exception("Unexpected error for %s: %s", assignment_id, exc)
-            fail_assignment(
-                assignment,
-                assignment_id,
-                "Generation failed unexpectedly. Please try again.",
+        with transaction.atomic():
+            GeneratedPaper.objects.update_or_create(
+                assignment=assignment,
+                defaults={"content": paper_json},
             )
-            return
+
+            assignment.status = Assignment.Status.COMPLETED
+            assignment.save(update_fields=["status", "updated_at"])
+            logger.info("Assignment %s completed successfully.", assignment_id)
+
+            notify_client(
+                assignment_id,
+                "generation_complete",
+                {
+                    "type": "generation_complete",
+                    "status": "completed",
+                    "paper": paper_json,
+                },
+            )
+
+    except LLMTimeoutError as exc:
+        fail_assignment(
+            assignment,
+            assignment_id,
+            "AI generation timed out. Please try again.",
+        )
+
+    except (ValueError, APIError) as exc:
+        logger.error("API or parse error for %s: %s", assignment_id, exc)
+        if self.request.retries < MAX_RETRIES:
+            countdown = 5 if isinstance(exc, APIError) else 3
+            self.retry(countdown=countdown, exc=exc)
+        else:
+            error_msg = (
+                "Gemini API is currently experiencing high demand. Please try again in a few moments."
+                if isinstance(exc, APIError)
+                else "Failed to parse AI response after multiple retries."
+            )
+            fail_assignment(assignment, assignment_id, error_msg)
+
+    except Exception as exc:
+        logger.exception("Unexpected error for %s: %s", assignment_id, exc)
+        fail_assignment(
+            assignment,
+            assignment_id,
+            "Generation failed unexpectedly. Please try again.",
+        )
